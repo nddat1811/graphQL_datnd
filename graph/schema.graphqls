@@ -15,12 +15,13 @@ type User {
 }
 
 type Query {
-  todos: [Todo!]!
+  todos(done: Boolean!): [Todo!]!
 }
 
 input NewTodo {
   text: String!
   userId: String!
+  done: Boolean!
 }
 
 type Mutation {

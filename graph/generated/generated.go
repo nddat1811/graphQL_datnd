@@ -49,7 +49,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Todos func(childComplexity int) int
+		Todos func(childComplexity int, done bool) int
 	}
 
 	Todo struct {
@@ -69,7 +69,7 @@ type MutationResolver interface {
 	CreateTodo(ctx context.Context, input model.NewTodo) (*model.Todo, error)
 }
 type QueryResolver interface {
-	Todos(ctx context.Context) ([]*model.Todo, error)
+	Todos(ctx context.Context, done bool) ([]*model.Todo, error)
 }
 
 type executableSchema struct {
@@ -104,7 +104,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.Query.Todos(childComplexity), true
+		args, err := ec.field_Query_todos_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Todos(childComplexity, args["done"].(bool)), true
 
 	case "Todo.done":
 		if e.complexity.Todo.Done == nil {
@@ -234,12 +239,13 @@ type User {
 }
 
 type Query {
-  todos: [Todo!]!
+  todos(done: Boolean!): [Todo!]!
 }
 
 input NewTodo {
   text: String!
   userId: String!
+  done: Boolean!
 }
 
 type Mutation {
@@ -280,6 +286,21 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		}
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_todos_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 bool
+	if tmp, ok := rawArgs["done"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("done"))
+		arg0, err = ec.unmarshalNBoolean2bool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["done"] = arg0
 	return args, nil
 }
 
@@ -400,7 +421,7 @@ func (ec *executionContext) _Query_todos(ctx context.Context, field graphql.Coll
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Todos(rctx)
+		return ec.resolvers.Query().Todos(rctx, fc.Args["done"].(bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -436,6 +457,17 @@ func (ec *executionContext) fieldContext_Query_todos(ctx context.Context, field 
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Todo", field.Name)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_todos_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }
@@ -2619,7 +2651,7 @@ func (ec *executionContext) unmarshalInputNewTodo(ctx context.Context, obj inter
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"text", "userId"}
+	fieldsInOrder := [...]string{"text", "userId", "done"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -2639,6 +2671,14 @@ func (ec *executionContext) unmarshalInputNewTodo(ctx context.Context, obj inter
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
 			it.UserID, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "done":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("done"))
+			it.Done, err = ec.unmarshalNBoolean2bool(ctx, v)
 			if err != nil {
 				return it, err
 			}
